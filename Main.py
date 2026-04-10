@@ -8,8 +8,111 @@ import errno
 import subprocess
 from datetime import datetime
 from openpyxl import load_workbook
+from pathlib import Path
 
-# --- PFAD-LOGIK FÜR EXE-BETRIEB ---
+# --- GIT UPDATE-FUNKTIONEN ---
+REPO_URL = "https://github.com/Lole2k05/Reinit-Raumplaner2.git"
+
+def check_and_pull_updates():
+    """Prüft auf Updates und pullt diese automatisch"""
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # Prüfe, ob wir in einem Git-Repo sind
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-dir"],
+            cwd=current_dir,
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode != 0:
+            print("⚠ Kein Git-Repository gefunden. Initialisiere Repository...")
+            initialize_git_repo(current_dir)
+            return
+        
+        # Hole Remote-Informationen
+        subprocess.run(
+            ["git", "fetch", "origin"],
+            cwd=current_dir,
+            capture_output=True,
+            check=True
+        )
+        
+        # Prüfe auf Unterschiede zwischen local und remote
+        result = subprocess.run(
+            ["git", "status", "-uno"],
+            cwd=current_dir,
+            capture_output=True,
+            text=True
+        )
+        
+        if "behind" in result.stdout.lower():
+            print("📥 Neuere Version verfügbar! Starte Update...")
+            pull_updates(current_dir)
+        else:
+            print("✓ Schon auf neuester Version")
+            
+    except Exception as e:
+        print(f"❌ Fehler beim Update-Check: {e}")
+
+def initialize_git_repo(directory):
+    """Initialisiert ein Git-Repository"""
+    try:
+        subprocess.run(
+            ["git", "init"],
+            cwd=directory,
+            check=True,
+            capture_output=True
+        )
+        
+        subprocess.run(
+            ["git", "remote", "add", "origin", REPO_URL],
+            cwd=directory,
+            check=True,
+            capture_output=True
+        )
+        
+        subprocess.run(
+            ["git", "fetch", "origin"],
+            cwd=directory,
+            check=True,
+            capture_output=True
+        )
+        
+        subprocess.run(
+            ["git", "checkout", "-b", "main", "origin/main"],
+            cwd=directory,
+            capture_output=True
+        )
+        
+        print("✓ Git-Repository initialisiert")
+        
+    except Exception as e:
+        print(f"❌ Fehler beim Initialisieren: {e}")
+
+def pull_updates(directory):
+    """Pullt die neuesten Updates"""
+    try:
+        result = subprocess.run(
+            ["git", "pull", "origin", "main"],
+            cwd=directory,
+            capture_output=True,
+            text=True
+        )
+        
+        if result.returncode == 0:
+            print("✓ Updates erfolgreich installiert!")
+            return True
+        else:
+            print(f"⚠ Pull-Fehler: {result.stderr}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Fehler beim Pullen: {e}")
+        return False
+
+
 def get_resource_path(relative_path):
     """ Liefert den richtigen Pfad, egal ob als .py oder .exe gestartet """
     if hasattr(sys, '_MEIPASS'):
@@ -480,6 +583,9 @@ class MasterPrasentation:
 
 # --- STARTFUNKTION ---
 def start_app():
+    # Prüfe und hole Updates
+    check_and_pull_updates()
+    
     # Git Repository Check: Stellt sicher, dass das lokale Repo nicht vom GitHub Link ist
     project_dir = os.path.dirname(__file__)
     git_dir = os.path.join(project_dir, ".git")
